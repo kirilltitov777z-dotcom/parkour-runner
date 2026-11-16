@@ -34,6 +34,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install "buildozer==1.5.0" "cython<3"
 
+      - name: Fix sdkmanager path
+        run: |
+          SDK=/usr/local/lib/android/sdk
+          if [ ! -f "$SDK/tools/bin/sdkmanager" ]; then
+            SM=$(find "$SDK/cmdline-tools" -type f -name sdkmanager | head -1)
+            echo "Found sdkmanager: $SM"
+            sudo mkdir -p "$SDK/tools/bin"
+            sudo ln -sf "$SM" "$SDK/tools/bin/sdkmanager"
+          fi
+          ls -l "$SDK/tools/bin/sdkmanager"
+          yes | "$SDK/tools/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
       - name: Build APK
         run: buildozer -v android debug
 
