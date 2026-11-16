@@ -286,7 +286,11 @@ SAVE_NAME = "save.json"
 
 
 def save_path():
-    base = os.getenv("APPDATA") or os.path.expanduser("~") or os.getcwd()
+    import sys
+    if sys.platform == "android" or os.getenv("ANDROID_ROOT"):
+        base = os.getcwd()
+    else:
+        base = os.getenv("APPDATA") or os.path.expanduser("~") or os.getcwd()
     d = os.path.join(base, "ParkourGame")
     try:
         os.makedirs(d, exist_ok=True)

@@ -36,6 +36,17 @@
    git push origin v1.0
    ```
 
+## Сборка APK для Android
+
+В репозитории есть workflow **Build Android APK**. Он запускается при пуше в `main`,
+по тегу `v*` или вручную через **Actions → Build Android APK → Run workflow**.
+
+- Готовый APK лежит в **Actions → Build Android APK → Artifacts → ParkourRunner-apk**,
+  а по тегу `v*` он ещё и прикрепляется к Release рядом с EXE.
+- Игра адаптирована под телефон: экран масштабируется, внизу сенсорные кнопки
+  ◀ ▶ и ПРЫЖОК. Прогресс сохраняется во внутренней папке приложения.
+- Сборка идёт через `buildozer` + `python-for-android` (pygame, SDL2), ARM64.
+
 ## Локальный запуск (для разработки)
 
 ```

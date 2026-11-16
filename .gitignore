@@ -2,7 +2,10 @@ __pycache__/
 *.pyc
 build/
 dist/
+bin/
+.buildozer/
 *.spec
+!buildozer.spec
 error.log
 hero_crop.jpg
 hero.png

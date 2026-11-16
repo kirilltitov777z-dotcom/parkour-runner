@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """Основная логика и все экраны игры."""
 import math
+import os
 import random
+import sys
 
 import pygame
 from pygame.locals import *
@@ -15,12 +17,30 @@ from levels import LEVEL_COUNT, make_level, make_endless, endless_chunk, make_ti
 from hero_asset import load_hero
 
 SPRITE_H = 86
+CTRL_LEFT = (16, H - 104, 86, 86)
+CTRL_RIGHT = (112, H - 104, 86, 86)
+CTRL_JUMP = (W - 132, H - 114, 116, 96)
 
 
 class Game:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((W, H))
+        self.mobile = (sys.platform == "android" or "ANDROID_ROOT" in os.environ)
+        if self.mobile:
+            try:
+                info = pygame.display.Info()
+                self.real_screen = pygame.display.set_mode((info.current_w, info.current_h), pygame.FULLSCREEN)
+            except Exception:
+                self.real_screen = pygame.display.set_mode((W, H), pygame.FULLSCREEN)
+            self.base = pygame.Surface((W, H))
+            self.screen = self.base
+            self.scale, self.ox, self.oy = 1.0, 0, 0
+            self.calc_scale()
+        else:
+            self.real_screen = None
+            self.base = None
+            self.screen = pygame.display.set_mode((W, H))
+        self.touch = {"left": False, "right": False, "jump": False}
         pygame.display.set_caption("PARKOUR RUNNER - паркур")
         try:
             self.icon = pygame.Surface((32, 32), pygame.SRCALPHA)
@@ -63,7 +83,29 @@ class Game:
         self.set_fullscreen(bool(self.save.get("fullscreen", False)))
 
     # ---------- служебное ----------
+    def calc_scale(self):
+        if not self.mobile:
+            return
+        sw, sh = self.real_screen.get_size()
+        self.scale = min(sw / W, sh / H)
+        self.ox = int((sw - W * self.scale) / 2)
+        self.oy = int((sh - H * self.scale) / 2)
+
+    def to_base(self, pos):
+        if not self.mobile:
+            return pos
+        return ((pos[0] - self.ox) / self.scale, (pos[1] - self.oy) / self.scale)
+
+    def present(self):
+        if self.mobile:
+            big = pygame.transform.smoothscale(self.base, (int(W * self.scale), int(H * self.scale)))
+            self.real_screen.fill((0, 0, 0))
+            self.real_screen.blit(big, (self.ox, self.oy))
+        pygame.display.flip()
+
     def set_fullscreen(self, on):
+        if self.mobile:
+            return
         try:
             self.screen = pygame.display.set_mode((W, H), pygame.FULLSCREEN if on else 0)
             self.save["fullscreen"] = on
@@ -179,16 +221,39 @@ class Game:
         self.state = "play"
 
     # ---------- события ----------
+    def touch_at(self, pos):
+        """Возвращает имя нажатой сенсорной кнопки или None."""
+        for name, r in (("left", CTRL_LEFT), ("right", CTRL_RIGHT), ("jump", CTRL_JUMP)):
+            if pygame.Rect(r).collidepoint(pos):
+                return name
+        return None
+
     def events(self):
         self.click = False
         for e in pygame.event.get():
             if e.type == QUIT:
                 self.running = False
             elif e.type == MOUSEMOTION:
-                self.mouse = e.pos
+                self.mouse = self.to_base(e.pos)
+                if self.mobile and self.state == "play":
+                    held = self.touch_at(self.mouse) if getattr(e, "buttons", (0,)) and e.buttons[0] else None
+                    for k in ("left", "right", "jump"):
+                        self.touch[k] = (held == k)
             elif e.type == MOUSEBUTTONDOWN:
-                self.mouse = e.pos
-                self.click = True
+                self.mouse = self.to_base(e.pos)
+                if self.mobile and self.state == "play":
+                    k = self.touch_at(self.mouse)
+                    if k:
+                        self.touch[k] = True
+                        if k == "jump":
+                            self.jump_req = True
+                else:
+                    self.click = True
+            elif e.type == MOUSEBUTTONUP:
+                if self.mobile:
+                    k = self.touch_at(self.to_base(e.pos))
+                    if k:
+                        self.touch[k] = False
             elif e.type == KEYDOWN:
                 if e.key == K_ESCAPE:
                     if self.state == "play":
@@ -228,6 +293,11 @@ class Game:
     # ---------- обновление ----------
     def update(self):
         self.t += self.dt
+        if self.click:
+            for b in self.buttons:
+                if pygame.Rect(b["rect"]).collidepoint(self.mouse):
+                    self.do(b["action"], b.get("value"))
+                    break
         if self.msg_t > 0:
             self.msg_t -= self.dt
         if self.shake > 0:
@@ -243,9 +313,9 @@ class Game:
         self.run_time += self.dt
         keys = pygame.key.get_pressed()
         move = 0
-        if keys[K_LEFT] or keys[K_a]:
+        if keys[K_LEFT] or keys[K_a] or self.touch["left"]:
             move -= 1
-        if keys[K_RIGHT] or keys[K_d]:
+        if keys[K_RIGHT] or keys[K_d] or self.touch["right"]:
             move += 1
         if move:
             p["facing"] = move
@@ -443,7 +513,7 @@ class Game:
             m.fill((0, 0, 0, int(150 * a)))
             s.blit(m, (0, H - 44))
             text(s, self.msg, W // 2, H - 30, 19, WHITE, "center", True)
-        pygame.display.flip()
+        self.present()
 
     def overlay(self, s):
         o = pygame.Surface((W, H), pygame.SRCALPHA)
@@ -585,7 +655,21 @@ class Game:
             text(s, "Рекорд: " + str(self.save.get("endless_best", 0)), W - 105, 37, 13, WHITE, "center")
         else:
             text(s, "%.1f сек" % self.run_time, W - 105, 20, 18, WHITE, "center", True)
-        text(s, "Space - прыжок (x2)", W // 2, H - 26, 14, (200, 205, 220), "center")
+        if self.mobile:
+            self.draw_touch(s)
+        else:
+            text(s, "Space - прыжок (x2)", W // 2, H - 26, 14, (200, 205, 220), "center")
+
+    def draw_touch(self, s):
+        for name, r in (("left", CTRL_LEFT), ("right", CTRL_RIGHT), ("jump", CTRL_JUMP)):
+            col = (70, 120, 210) if self.touch[name] else (45, 60, 95)
+            pygame.draw.circle(s, (*col, 200), (r[0] + r[2] // 2, r[1] + r[3] // 2),
+                               min(r[2], r[3]) // 2)
+            pygame.draw.circle(s, (150, 185, 240), (r[0] + r[2] // 2, r[1] + r[3] // 2),
+                               min(r[2], r[3]) // 2, 2)
+        text(s, "◀", CTRL_LEFT[0] + 43, CTRL_LEFT[1] + 43, 34, WHITE, "center", True)
+        text(s, "▶", CTRL_RIGHT[0] + 43, CTRL_RIGHT[1] + 43, 34, WHITE, "center", True)
+        text(s, "ПРЫЖОК", CTRL_JUMP[0] + 58, CTRL_JUMP[1] + 48, 17, WHITE, "center", True)
 
     def draw_menu(self, s):
         theme = [t for t in __import__("core").THEMES][int(self.t * 0.15) % 6]
