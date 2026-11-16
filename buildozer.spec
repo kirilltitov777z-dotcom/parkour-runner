@@ -17,9 +17,11 @@ fullscreen = 1
 android.api = 35
 android.minapi = 21
 android.ndk_api = 24
+android.ndk = 25c
 android.archs = arm64-v8a
 android.sdk_path = /usr/local/lib/android/sdk
 android.build_tools_version = 35.0.0
+android.accept_sdk_license = True
 android.permissions =
 android.gradle_dependencies =
 
