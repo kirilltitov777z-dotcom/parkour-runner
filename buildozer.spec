@@ -9,7 +9,7 @@ source.exclude_exts = spec,md,yml,yaml
 source.exclude_dirs = dist,build,.git
 
 version = 1.0
-requirements = python3,pygame
+requirements = python3==3.11.9,pygame==2.6.1
 
 orientation = landscape
 fullscreen = 1
