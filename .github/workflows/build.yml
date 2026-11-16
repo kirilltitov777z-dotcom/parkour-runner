@@ -28,13 +28,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Build EXE
-        run: |
-          pyinstaller --noconfirm --clean --onefile --windowed ^
-            --name ParkourRunner ^
-            --exclude-module numpy ^
-            --exclude-module PIL ^
-            --exclude-module cv2 ^
-            main.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name ParkourRunner --exclude-module numpy --exclude-module PIL --exclude-module cv2 main.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
