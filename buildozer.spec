@@ -26,6 +26,7 @@ android.permissions =
 android.gradle_dependencies =
 
 p4a.branch = develop
+p4a.local_recipes = recipes
 
 [buildozer]
 log_level = 2
